@@ -1,241 +1,346 @@
-"""Datasets page component - Full CRUD operations."""
 <template>
   <div class="datasets-page">
     <div class="page-header">
-      <h2>Dataset Registry</h2>
-      <button @click="refreshDatasets" class="btn btn-secondary" :disabled="isLoading">
-        🔄 Refresh
+      <div>
+        <h1>Dataset Registry</h1>
+        <p class="subtitle">Manage and monitor your datasets</p>
+      </div>
+      <button @click="refreshDatasets" class="btn btn-primary" :disabled="isLoading">
+        <span v-if="!isLoading">🔄 Refresh</span>
+        <span v-else>Loading...</span>
       </button>
     </div>
 
-    <div class="actions">
-      <button @click="isCreating = !isCreating" class="btn btn-primary" :disabled="isLoading">
-        {{ isCreating ? 'Cancel' : '+ New Dataset' }}
-      </button>
+    <!-- Alert Messages -->
+    <div v-if="successMessage" class="alert alert-success">
+      ✅ {{ successMessage }}
+      <button @click="successMessage = ''" class="close-btn">×</button>
     </div>
 
-    <div v-if="isCreating" class="create-form">
-      <h3>Create New Dataset</h3>
-      <form @submit.prevent="createDataset">
+    <div v-if="error" class="alert alert-error">
+      ❌ {{ error }}
+      <button @click="error = ''" class="close-btn">×</button>
+    </div>
+
+    <!-- Create/Edit Form -->
+    <div class="form-section">
+      <h2>{{ editingId ? 'Edit Dataset' : 'Create New Dataset' }}</h2>
+      
+      <form @submit.prevent="handleSubmit" class="dataset-form">
         <div class="form-group">
-          <label for="name">Name:</label>
+          <label for="name">Dataset Name *</label>
           <input
             id="name"
             v-model="formData.name"
             type="text"
-            placeholder="Dataset name"
+            placeholder="e.g., sales_data"
             required
+            maxlength="255"
           />
         </div>
 
         <div class="form-group">
-          <label for="source">Source:</label>
+          <label for="source">Data Source *</label>
           <input
             id="source"
             v-model="formData.source"
             type="text"
-            placeholder="s3://bucket/path"
+            placeholder="e.g., s3://bucket/path"
             required
           />
         </div>
 
         <div class="form-group">
-          <label for="description">Description:</label>
+          <label for="description">Description</label>
           <textarea
             id="description"
             v-model="formData.description"
             placeholder="Optional description"
+            maxlength="1000"
             rows="3"
           ></textarea>
         </div>
 
-        <button type="submit" class="btn btn-success" :disabled="isLoading">
-          {{ isLoading ? 'Creating...' : 'Create Dataset' }}
-        </button>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-success" :disabled="isCreating">
+            {{ editingId ? 'Update Dataset' : 'Create Dataset' }}
+          </button>
+          
+          <button 
+            v-if="editingId" 
+            type="button" 
+            @click="cancelEdit" 
+            class="btn btn-secondary"
+          >
+            Cancel
+          </button>
+        </div>
       </form>
     </div>
 
-    <div v-if="error" class="alert alert-error">
-      {{ error }}
-    </div>
+    <!-- Datasets Table -->
+    <div class="table-section">
+      <h2>Datasets ({{ datasets.length }})</h2>
+      
+      <div v-if="datasets.length === 0" class="empty-state">
+        <p>No datasets found. Create one to get started!</p>
+      </div>
 
-    <div v-if="isLoading" class="loading">
-      Loading datasets...
-    </div>
-
-    <div v-else-if="datasets.length > 0" class="table-wrapper">
-      <table class="datasets-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Source</th>
-            <th>Description</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="dataset in datasets" :key="dataset.id">
-            <td>{{ dataset.id }}</td>
-            <td>{{ dataset.name }}</td>
-            <td><code>{{ dataset.source }}</code></td>
-            <td>{{ dataset.description || '-' }}</td>
-            <td>
-              <span :class="`badge badge-${dataset.status}`">
-                {{ dataset.status }}
-              </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div v-else class="empty-state">
-      <p>No datasets yet. Create your first dataset!</p>
+      <DatasetTable
+        v-else
+        :datasets="datasets"
+        @edit="handleEdit"
+        @delete="handleDelete"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import DatasetTable from '../components/DatasetTable.vue'
+import { 
+  fetchDatasets, 
+  createDataset, 
+  updateDataset, 
+  deleteDataset,
+  type Dataset,
+  type DatasetCreate 
+} from '../services/datasets'
 
-interface Dataset {
-  id: string
-  name: string
-  source: string
-  description: string
-  status: string
-}
-
+// State
 const datasets = ref<Dataset[]>([])
 const isLoading = ref(false)
 const isCreating = ref(false)
-const error = ref<string | null>(null)
+const error = ref('')
+const successMessage = ref('')
+const editingId = ref<string | null>(null)
 
-const formData = ref({
+// Form data
+const formData = ref<DatasetCreate>({
   name: '',
   source: '',
   description: ''
 })
 
+// Load datasets on mount
 onMounted(async () => {
   await loadDatasets()
 })
 
-async function loadDatasets(): Promise<void> {
+// Load datasets from API
+async function loadDatasets() {
   isLoading.value = true
-  error.value = null
-
+  error.value = ''
   try {
-    const response = await fetch('http://localhost:8000/api/datasets')
-    if (!response.ok) throw new Error('Failed to load datasets')
-    datasets.value = await response.json()
+    datasets.value = await fetchDatasets()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Unknown error'
+    error.value = err instanceof Error ? err.message : 'Failed to load datasets'
   } finally {
     isLoading.value = false
   }
 }
 
-async function createDataset(): Promise<void> {
-  isLoading.value = true
-  error.value = null
+// Refresh datasets
+async function refreshDatasets() {
+  await loadDatasets()
+}
 
+// Handle form submission (create or update)
+async function handleSubmit() {
+  isCreating.value = true
+  error.value = ''
   try {
-    const response = await fetch('http://localhost:8000/api/datasets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData.value)
-    })
-
-    if (!response.ok) throw new Error('Failed to create dataset')
-
-    const newDataset = await response.json()
-    datasets.value.push(newDataset)
-
+    if (editingId.value) {
+      // Update existing dataset
+      await updateDataset(editingId.value, formData.value)
+      successMessage.value = 'Dataset updated successfully!'
+      editingId.value = null
+    } else {
+      // Create new dataset
+      await createDataset(formData.value)
+      successMessage.value = 'Dataset created successfully!'
+    }
+    
     // Reset form
-    formData.value = { name: '', source: '', description: '' }
-    isCreating.value = false
+    resetForm()
+    
+    // Reload datasets
+    await loadDatasets()
+    
+    // Clear success message after 3 seconds
+    setTimeout(() => {
+      successMessage.value = ''
+    }, 3000)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Unknown error'
+    error.value = err instanceof Error ? err.message : 'Failed to save dataset'
   } finally {
-    isLoading.value = false
+    isCreating.value = false
+  }
+}
+
+// Handle edit action from table
+async function handleEdit(dataset: Dataset) {
+  editingId.value = dataset.id
+  formData.value = {
+    name: dataset.name,
+    source: dataset.source,
+    description: dataset.description
+  }
+  
+  // Scroll to form
+  const formSection = document.querySelector('.form-section')
+  formSection?.scrollIntoView({ behavior: 'smooth' })
+}
+
+// Handle delete action from table
+async function handleDelete(id: string) {
+  if (!confirm('Are you sure you want to delete this dataset?')) {
+    return
+  }
+
+  error.value = ''
+  try {
+    await deleteDataset(id)
+    successMessage.value = 'Dataset deleted successfully!'
+    await loadDatasets()
+    
+    // Clear success message after 3 seconds
+    setTimeout(() => {
+      successMessage.value = ''
+    }, 3000)
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to delete dataset'
+  }
+}
+
+// Cancel edit
+function cancelEdit() {
+  editingId.value = null
+  resetForm()
+}
+
+// Reset form to initial state
+function resetForm() {
+  formData.value = {
+    name: '',
+    source: '',
+    description: ''
   }
 }
 </script>
 
 <style scoped>
 .datasets-page {
-  padding: 2rem 0;
-}
-
-h2 {
-  color: #2c3e50;
-  margin-bottom: 2rem;
-}
-
-.actions {
-  margin-bottom: 2rem;
-}
-
-.btn {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background 0.3s;
-}
-
-.btn-primary {
-  background: #0066cc;
-  color: white;
-}
-
-.btn-primary:hover {
-  background: #0052a3;
-}
-
-.btn-success {
-  background: #28a745;
-  color: white;
-}
-
-.btn-success:hover:not(:disabled) {
-  background: #218838;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.create-form {
-  background: white;
   padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  margin: 0;
+  color: #1a1a1a;
+  font-size: 2rem;
+}
+
+.subtitle {
+  margin: 0.5rem 0 0 0;
+  color: #666;
+  font-size: 0.95rem;
+}
+
+/* Alerts */
+.alert {
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  animation: slideIn 0.3s ease-in-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.alert-success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.alert-error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.close-btn:hover {
+  opacity: 1;
+}
+
+/* Form Section */
+.form-section {
+  background: #f9f9f9;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  border: 1px solid #e0e0e0;
+}
+
+.form-section h2 {
+  margin-top: 0;
+  color: #1a1a1a;
+}
+
+.dataset-form {
+  display: grid;
+  gap: 1rem;
 }
 
 .form-group {
-  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .form-group label {
-  display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;
-  color: #2c3e50;
+  color: #333;
 }
 
 .form-group input,
 .form-group textarea {
-  width: 100%;
-  padding: 0.5rem;
+  padding: 0.75rem;
   border: 1px solid #ddd;
   border-radius: 4px;
-  font-size: 1rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
 }
 
 .form-group input:focus,
@@ -245,89 +350,96 @@ h2 {
   box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
 }
 
-.alert {
-  padding: 1rem;
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+/* Buttons */
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
   border-radius: 4px;
-  margin-bottom: 2rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
 }
 
-.alert-error {
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-.loading {
+.btn-primary {
+  background-color: #0066cc;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #0052a3;
+}
+
+.btn-success {
+  background-color: #28a745;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #5a6268;
+}
+
+/* Table Section */
+.table-section {
+  background: #f9f9f9;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.table-section h2 {
+  margin-top: 0;
+  color: #1a1a1a;
+}
+
+.empty-state {
   text-align: center;
   padding: 2rem;
   color: #666;
 }
 
-.table-wrapper {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  overflow: auto;
-}
+/* Responsive */
+@media (max-width: 768px) {
+  .datasets-page {
+    padding: 1rem;
+  }
 
-.datasets-table {
-  width: 100%;
-  border-collapse: collapse;
-}
+  .page-header {
+    flex-direction: column;
+    gap: 1rem;
+  }
 
-.datasets-table th {
-  background: #f8f9fa;
-  padding: 1rem;
-  text-align: left;
-  font-weight: 600;
-  color: #2c3e50;
-  border-bottom: 2px solid #dee2e6;
-}
+  .page-header h1 {
+    font-size: 1.5rem;
+  }
 
-.datasets-table td {
-  padding: 1rem;
-  border-bottom: 1px solid #dee2e6;
-}
+  .form-actions {
+    flex-direction: column;
+  }
 
-.datasets-table tbody tr:hover {
-  background: #f8f9fa;
-}
-
-code {
-  background: #f5f5f5;
-  padding: 0.2rem 0.4rem;
-  border-radius: 3px;
-  font-size: 0.9rem;
-}
-
-.badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.badge-active {
-  background: #d4edda;
-  color: #155724;
-}
-
-.badge-archived {
-  background: #e2e3e5;
-  color: #383d41;
-}
-
-.badge-processing {
-  background: #cfe2ff;
-  color: #084298;
-}
-
-.empty-state {
-  background: white;
-  padding: 3rem 2rem;
-  border-radius: 8px;
-  text-align: center;
-  color: #666;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  .btn {
+    width: 100%;
+  }
 }
 </style>
