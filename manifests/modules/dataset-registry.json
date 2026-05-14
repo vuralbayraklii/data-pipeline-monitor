@@ -1,0 +1,70 @@
+{
+  "module_name": "dataset-registry",
+  "version": "0.1.0",
+  "status": "in-development",
+  "description": "Dataset registry module - provides CRUD operations for managing datasets in the platform",
+  "owner": "agent",
+  
+  "backend": {
+    "models": [
+      "apps/backend/app/models/dataset.py"
+    ],
+    "routes": [
+      "apps/backend/app/api/routes/datasets.py"
+    ],
+    "tests": [
+      "tests/test_datasets.py"
+    ]
+  },
+  
+  "frontend": {
+    "pages": [
+      "apps/frontend/src/pages/DatasetsPage.vue"
+    ],
+    "components": [
+      "apps/frontend/src/components/DatasetTable.vue"
+    ],
+    "services": [
+      "apps/frontend/src/services/datasets.ts"
+    ]
+  },
+  
+  "documentation": [
+    "docs/backend/api.md",
+    "docs/backend/models.md",
+    "docs/frontend/components.md"
+  ],
+  
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/api/datasets",
+      "description": "Create a new dataset",
+      "auth": false,
+      "status": "implemented"
+    },
+    {
+      "method": "GET",
+      "path": "/api/datasets",
+      "description": "List all datasets",
+      "auth": false,
+      "status": "implemented"
+    },
+    {
+      "method": "GET",
+      "path": "/api/datasets/{id}",
+      "description": "Get a specific dataset",
+      "auth": false,
+      "status": "implemented"
+    }
+  ],
+  
+  "dependencies": {
+    "backend": ["fastapi", "pydantic"],
+    "frontend": ["vue", "vue-router", "typescript"]
+  },
+  
+  "related_modules": [],
+  "blocking": [],
+  "blockers": []
+}

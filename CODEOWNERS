@@ -1,0 +1,29 @@
+"""CODEOWNERS file - Defines repository ownership for GitHub."""
+# This file defines who has authority over different parts of the codebase
+# Reference: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Backend
+/apps/backend/ @backend-team
+/apps/backend/app/models/ @backend-team
+/apps/backend/app/api/ @backend-team
+/tests/ @backend-team
+
+# Frontend  
+/apps/frontend/ @frontend-team
+/apps/frontend/src/ @frontend-team
+
+# Data pipelines
+/data/pipelines/ @data-team
+/data/scripts/ @data-team
+
+# Documentation
+/docs/ @maintainers
+*.md @maintainers
+
+# DevOps and CI
+/.github/ @maintainers
+/Makefile @maintainers
+
+# Configuration files
+.vscode/ @maintainers
+manifests/ @maintainers

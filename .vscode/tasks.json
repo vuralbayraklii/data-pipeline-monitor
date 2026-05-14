@@ -1,0 +1,89 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Backend: Install dependencies",
+      "type": "shell",
+      "command": "cd ${workspaceFolder}/apps/backend && pip install -r requirements.txt",
+      "presentation": {
+        "reveal": "always"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Backend: Run tests",
+      "type": "shell",
+      "command": "cd ${workspaceFolder}/apps/backend && pytest tests/ -v",
+      "presentation": {
+        "reveal": "always"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Backend: Run FastAPI dev server",
+      "type": "shell",
+      "command": "cd ${workspaceFolder}/apps/backend && uvicorn app.main:app --reload",
+      "presentation": {
+        "reveal": "always"
+      },
+      "group": {
+        "kind": "none",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Frontend: Install dependencies",
+      "type": "shell",
+      "command": "cd ${workspaceFolder}/apps/frontend && npm install",
+      "presentation": {
+        "reveal": "always"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Frontend: Run tests",
+      "type": "shell",
+      "command": "cd ${workspaceFolder}/apps/frontend && npm run test",
+      "presentation": {
+        "reveal": "always"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Frontend: Dev server",
+      "type": "shell",
+      "command": "cd ${workspaceFolder}/apps/frontend && npm run dev",
+      "presentation": {
+        "reveal": "always"
+      },
+      "group": {
+        "kind": "none",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Docs: Check links",
+      "type": "shell",
+      "command": "echo 'Checking documentation links...' && ls -la ${workspaceFolder}/docs/",
+      "presentation": {
+        "reveal": "always"
+      },
+      "group": {
+        "kind": "none",
+        "isDefault": false
+      }
+    }
+  ]
+}

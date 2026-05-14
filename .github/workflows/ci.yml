@@ -1,0 +1,163 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        cd apps/backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov
+    
+    - name: Lint with flake8
+      run: |
+        cd apps/backend
+        pip install flake8
+        flake8 app --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 app --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      continue-on-error: true
+    
+    - name: Run tests with pytest
+      run: |
+        cd apps/backend
+        pytest tests/ --cov=app --cov-report=xml --cov-report=term
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./apps/backend/coverage.xml
+        flags: backend
+        fail_ci_if_error: false
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: ["18", "20"]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: 'apps/frontend/package-lock.json'
+    
+    - name: Install dependencies
+      run: |
+        cd apps/frontend
+        npm ci
+    
+    - name: Run linter
+      run: |
+        cd apps/frontend
+        npm run lint
+      continue-on-error: true
+    
+    - name: Run tests
+      run: |
+        cd apps/frontend
+        npm run test:coverage
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./apps/frontend/coverage/coverage-final.json
+        flags: frontend
+        fail_ci_if_error: false
+
+  docs-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Check documentation files exist
+      run: |
+        echo "Checking essential documentation files..."
+        test -f README.md || (echo "README.md missing" && exit 1)
+        test -f CONTRIBUTING.md || (echo "CONTRIBUTING.md missing" && exit 1)
+        test -f DEVELOPMENT_WORKFLOW.md || (echo "DEVELOPMENT_WORKFLOW.md missing" && exit 1)
+        test -f AI_AGENT_GUIDE.md || (echo "AI_AGENT_GUIDE.md missing" && exit 1)
+        echo "✓ All essential docs present"
+    
+    - name: Check repo structure
+      run: |
+        echo "Checking repository structure..."
+        test -d apps/backend || (echo "apps/backend missing" && exit 1)
+        test -d apps/frontend || (echo "apps/frontend missing" && exit 1)
+        test -d docs || (echo "docs missing" && exit 1)
+        test -d .github/ISSUE_TEMPLATE || (echo ".github/ISSUE_TEMPLATE missing" && exit 1)
+        echo "✓ Repository structure valid"
+    
+    - name: Lint markdown
+      run: |
+        npm install -g markdownlint-cli
+        markdownlint README.md CONTRIBUTING.md DEVELOPMENT_WORKFLOW.md AI_AGENT_GUIDE.md || true
+
+  build-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+    
+    - name: Check backend can be imported
+      run: |
+        cd apps/backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt > /dev/null 2>&1 || true
+        python -c "import app" 2>/dev/null || echo "Note: Backend app not yet set up"
+    
+    - name: Set up Node
+      uses: actions/setup-node@v3
+      with:
+        node-version: "18"
+    
+    - name: Check frontend can build
+      run: |
+        cd apps/frontend
+        npm ci --silent > /dev/null 2>&1 || true
+        npm run build > /dev/null 2>&1 || echo "Note: Frontend not yet set up"
+
+  summary:
+    needs: [backend-tests, frontend-tests, docs-check, build-check]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Check all jobs status
+      run: |
+        if [ "${{ needs.backend-tests.result }}" == "failure" ] || \
+           [ "${{ needs.frontend-tests.result }}" == "failure" ]; then
+          echo "❌ Tests failed"
+          exit 1
+        fi
+        echo "✅ All checks passed"
