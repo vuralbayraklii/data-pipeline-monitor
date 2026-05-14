@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api.routes import datasets
+from .api.routes import datasets, pipeline_runs, object_storage
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -23,6 +23,8 @@ app.add_middleware(
 
 # Include routers
 app.include_router(datasets.router)
+app.include_router(pipeline_runs.router)
+app.include_router(object_storage.router)
 
 @app.get("/", tags=["root"])
 async def root() -> dict:

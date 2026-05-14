@@ -46,7 +46,10 @@ class TestDatasetEndpoints:
         response = client.get("/api/datasets")
         
         assert response.status_code == 200
-        assert response.json() == []
+        data = response.json()
+        assert "items" in data
+        assert data["items"] == []
+        assert data["total"] == 0
 
     def test_list_datasets_after_creation(self):
         """Test listing datasets after creating some."""
@@ -61,8 +64,9 @@ class TestDatasetEndpoints:
         response = client.get("/api/datasets")
         
         assert response.status_code == 200
-        datasets = response.json()
-        assert len(datasets) >= 2
+        data = response.json()
+        assert "items" in data
+        assert len(data["items"]) >= 2
 
     def test_get_dataset_not_found(self):
         """Test getting a non-existent dataset."""
