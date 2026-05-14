@@ -1,10 +1,15 @@
-"""Datasets page component."""
+"""Datasets page component - Full CRUD operations."""
 <template>
   <div class="datasets-page">
-    <h2>Dataset Registry</h2>
+    <div class="page-header">
+      <h2>Dataset Registry</h2>
+      <button @click="refreshDatasets" class="btn btn-secondary" :disabled="isLoading">
+        🔄 Refresh
+      </button>
+    </div>
 
     <div class="actions">
-      <button @click="isCreating = !isCreating" class="btn btn-primary">
+      <button @click="isCreating = !isCreating" class="btn btn-primary" :disabled="isLoading">
         {{ isCreating ? 'Cancel' : '+ New Dataset' }}
       </button>
     </div>

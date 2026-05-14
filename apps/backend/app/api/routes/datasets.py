@@ -1,8 +1,8 @@
 """Dataset registry routes."""
 from typing import List
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
-from ..models.dataset import Dataset, DatasetCreate
+from app.models.dataset import Dataset, DatasetCreate
 
 router = APIRouter(
     prefix="/api/datasets",
@@ -62,7 +62,47 @@ async def get_dataset(dataset_id: str) -> Dataset:
         HTTPException: If dataset not found
     """
     if dataset_id not in _datasets:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Dataset not found")
     
     return _datasets[dataset_id]
+
+@router.put("/{dataset_id}", response_model=Dataset)
+async def update_dataset(dataset_id: str, dataset_update: DatasetCreate) -> Dataset:
+    """Update a dataset.
+    
+    Args:
+        dataset_id: The dataset identifier
+        dataset_update: The updated dataset data
+        
+    Returns:
+        The updated dataset
+        
+    Raises:
+        HTTPException: If dataset not found
+    """
+    if dataset_id not in _datasets:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    # Update dataset with new data
+    dataset = Dataset(
+        id=dataset_id,
+        **dataset_update.model_dump()
+    )
+    
+    _datasets[dataset_id] = dataset
+    return dataset
+
+@router.delete("/{dataset_id}", status_code=204)
+async def delete_dataset(dataset_id: str) -> None:
+    """Delete a dataset.
+    
+    Args:
+        dataset_id: The dataset identifier
+        
+    Raises:
+        HTTPException: If dataset not found
+    """
+    if dataset_id not in _datasets:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    del _datasets[dataset_id]

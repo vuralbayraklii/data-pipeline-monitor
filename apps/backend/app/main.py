@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+from .api.routes import datasets
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Data Pipeline Monitor API",
@@ -18,6 +20,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(datasets.router)
 
 @app.get("/", tags=["root"])
 async def root() -> dict:

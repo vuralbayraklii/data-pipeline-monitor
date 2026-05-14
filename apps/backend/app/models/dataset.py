@@ -1,6 +1,6 @@
 """Dataset data models."""
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class DatasetCreate(BaseModel):
     """Schema for creating a dataset."""
@@ -16,9 +16,8 @@ class Dataset(DatasetCreate):
         description="Dataset status"
     )
 
-    class Config:
-        """Pydantic configuration."""
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "ds_001",
                 "name": "sales_data",
@@ -27,3 +26,4 @@ class Dataset(DatasetCreate):
                 "status": "active"
             }
         }
+    )
